@@ -142,7 +142,8 @@ function M.excluded_paths_for_dir(deployment, dir)
         end
       elseif not excluded:find("/") and excluded:find("*") then
         -- pattern
-        table.insert(excludedPaths, excluded)
+        -- escape excluded
+        table.insert(excludedPaths, "\"" .. excluded .. "\"")
       end
     end
   end
@@ -248,11 +249,19 @@ function M.remote_rsync_path(local_path)
   if remote_path == nil then
     return
   end
+
+  -- remove port from path and store it
+  local remote_port = remote_path:match(":(%d+)")
+  if remote_port ~= nil then
+    remote_path = remote_path:gsub(":" .. remote_port, "")
+  end
+
   -- remove scp:// prefix from path
   remote_path = remote_path:gsub("^scp://", "")
   -- replace only the first occurrence of / with :
   remote_path = remote_path:gsub("/", ":", 1)
-  return remote_path, deployment
+
+  return remote_path, deployment, remote_port
 end
 
 -- upload the given file on BufWritePost event
@@ -452,7 +461,7 @@ end
 -- @param dir string
 -- @param upload boolean
 function M.sync_dir(dir, upload)
-  local remote_path, deployment = M.remote_rsync_path(dir)
+  local remote_path, deployment, remote_port = M.remote_rsync_path(dir)
   if remote_path == nil then
     return
   end
@@ -471,6 +480,11 @@ function M.sync_dir(dir, upload)
       vim.list_extend(cmd, { "--exclude", path })
     end
     vim.list_extend(cmd, expand_variables(config.options.download_rsync_params))
+
+    if remote_port ~= nil then
+      vim.list_extend(cmd, { "-e", "\"ssh -p " .. remote_port .. "\"" })
+    end
+
     vim.list_extend(cmd, { remote_path .. "/", dir .. "/" })
   end
 
@@ -493,7 +507,7 @@ function M.sync_dir(dir, upload)
 
     local output = {}
     local stderr = {}
-    vim.fn.jobstart(command, {
+    vim.fn.jobstart(table.concat(command, " "), {
       on_stderr = function(_, data, _)
         if data == nil or #data == 0 then
           return
@@ -550,7 +564,7 @@ function M.sync_dir(dir, upload)
 end
 
 function M.show_dir_diff(dir)
-  local remote_path, deployment = M.remote_rsync_path(dir)
+  local remote_path, deployment, remote_port = M.remote_rsync_path(dir)
   if remote_path == nil then
     return
   end
@@ -559,6 +573,10 @@ function M.show_dir_diff(dir)
   local cmd = { "rsync", "-rlzi", "--dry-run", "--checksum", "--delete", "--out-format=%n" }
   for _, path in pairs(excluded) do
     vim.list_extend(cmd, { "--exclude", path })
+  end
+
+  if remote_port ~= nil then
+    vim.list_extend(cmd, { "-e", "\"ssh -p " .. remote_port .. "\"" })
   end
 
   if config.options.upload_rsync_params ~= nil then
@@ -594,7 +612,7 @@ function M.show_dir_diff(dir)
 
     local output = {}
     local stderr = {}
-    vim.fn.jobstart(command, {
+    vim.fn.jobstart(table.concat(command, " "), {
       on_stderr = function(_, data, _)
         if data == nil or #data == 0 then
           return
