@@ -7,12 +7,12 @@ describe("remote path resolving", function()
   end
 
   local function remote_rsync_path(local_path)
-    local path, _ = transfer.remote_rsync_path(local_path)
+    local path, _, _ = transfer.remote_rsync_path(local_path)
     return path
   end
 
   local function excluded_paths(local_path)
-    local remote_path, deployment = transfer.remote_rsync_path(local_path)
+    local remote_path, deployment, _ = transfer.remote_rsync_path(local_path)
     if remote_path == nil then
       return
     end
