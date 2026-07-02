@@ -481,11 +481,11 @@ function M.sync_dir(dir, upload)
     end
     vim.list_extend(cmd, expand_variables(config.options.download_rsync_params))
 
-    if remote_port ~= nil then
-      vim.list_extend(cmd, { "-e", "\"ssh -p " .. remote_port .. "\"" })
-    end
-
     vim.list_extend(cmd, { remote_path .. "/", dir .. "/" })
+  end
+
+  if remote_port ~= nil then
+    vim.list_extend(cmd, { "-e", "\"ssh -p " .. remote_port .. "\"" })
   end
 
   build_command(deployment, cmd, function(command)
